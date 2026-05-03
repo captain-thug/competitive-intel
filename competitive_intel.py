@@ -28,6 +28,7 @@ import json
 import os
 import smtplib
 import sys
+import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
@@ -192,9 +193,8 @@ Do NOT filter or rank — capture everything; a separate curation step will sele
     max_continuations = 10
     for _ in range(max_continuations):
         with client.messages.stream(
-            model="claude-opus-4-7",
-            max_tokens=12000,
-            thinking={"type": "adaptive"},
+            model="claude-sonnet-4-6",
+            max_tokens=8000,
             tools=[
                 {"type": "web_search_20260209", "name": "web_search"},
             ],
@@ -229,6 +229,11 @@ def curate_top5(client: anthropic.Anthropic, raw_findings: str, last_state: Opti
     Uses structured output via client.messages.parse() to return typed JSON.
     """
     today = datetime.date.today().strftime("%B %d, %Y")
+
+    # Truncate raw findings before embedding in prompt
+    max_findings_chars = 12000
+    if len(raw_findings) > max_findings_chars:
+        raw_findings = raw_findings[:max_findings_chars] + "\n\n[findings truncated]"
 
     freshness_block = ""
     if last_state:
@@ -265,21 +270,28 @@ For each selected item:
 - title: punchy 6–10 word headline
 - summary: 2–3 sentences of factual detail, actionable signal only
 - why_it_matters: 1 sentence on the strategic implication for Amazon SageMaker Unified Studio
-- pm_summary: 4–6 sentence PM-focused briefing written for a senior PM who hasn't read the article. Cover: (1) exactly what happened or was announced, (2) key product/technical details that matter (pricing, limits, integrations, demo highlights), (3) what this signals about the competitor's strategy, (4) the specific threat or opportunity for Amazon SageMaker Unified Studio, and (5) what to watch or consider next. Be concrete — name features, numbers, and dates where available.
+- pm_summary: 3 sentence PM brief: (1) what happened and key details (features, pricing, dates), (2) what it signals about the competitor's strategy, (3) the specific threat or opportunity for Amazon SageMaker Unified Studio.
 - source_url: URL if available, otherwise null
 - importance_score: your internal 1–10 ranking (1 = lowest)
 
 Return exactly 5 items, ordered by importance_score descending."""
 
-    response = client.messages.parse(
-        model="claude-opus-4-7",
-        max_tokens=4096,
-        thinking={"type": "adaptive"},
-        messages=[{"role": "user", "content": prompt}],
-        output_format=CuratedReport,
-    )
+    for attempt in range(5):
+        try:
+            response = client.messages.parse(
+                model="claude-opus-4-7",
+                max_tokens=2500,
+                output_config={"effort": "medium"},
+                messages=[{"role": "user", "content": prompt}],
+                output_format=CuratedReport,
+            )
+            return response.parsed
+        except anthropic.RateLimitError:
+            wait = 60 * (attempt + 1)
+            print(f"  Rate limit hit — waiting {wait}s before retry {attempt + 1}/5...")
+            time.sleep(wait)
 
-    return response.parsed
+    raise RuntimeError("Curation failed after 5 retries due to rate limits")
 
 
 # ── Email builder ─────────────────────────────────────────────────────────────
@@ -439,6 +451,9 @@ def main() -> None:
     if not raw_findings:
         print("Error: research phase returned no findings", file=sys.stderr)
         sys.exit(1)
+
+    print("  Waiting 60s for rate limit window to reset...")
+    time.sleep(60)
 
     print("  Phase 2: Curating top 5 items...")
     curated = curate_top5(client, raw_findings, last_state)
