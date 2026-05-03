@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Competitive Intel</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --purple: #5046e5;
+      --red:    #ef4444;
+      --green:  #10b981;
+      --blue:   #3b82f6;
+      --gray:   #6b7280;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f1f0f7;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    /* ── Header ────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px 12px;
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      z-index: 10;
+      flex-shrink: 0;
+    }
+    .header-logo { font-size: 16px; font-weight: 800; color: var(--purple); letter-spacing: -0.3px; }
+    .header-sub  { font-size: 11px; color: #9ca3af; margin-top: 1px; }
+
+    .header-right { display: flex; gap: 8px; align-items: center; }
+
+    .icon-btn {
+      background: none; border: none; cursor: pointer;
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: #6b7280; font-size: 18px; transition: background 0.15s;
+    }
+    .icon-btn:hover { background: #f3f4f6; }
+    .icon-btn.has-badge { position: relative; }
+    .icon-btn.has-badge::after {
+      content: attr(data-count);
+      position: absolute; top: 2px; right: 2px;
+      background: var(--purple); color: #fff;
+      font-size: 9px; font-weight: 700;
+      min-width: 16px; height: 16px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0 3px;
+    }
+
+    /* ── Stack area ─────────────────────────────────────────── */
+    #stack-area {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      padding: 16px 16px 0;
+      overflow: hidden;
+    }
+
+    /* ── Empty state ────────────────────────────────────────── */
+    #empty-state {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      text-align: center;
+      color: #9ca3af;
+    }
+    #empty-state .emoji { font-size: 48px; }
+    #empty-state h3 { font-size: 18px; color: #374151; font-weight: 700; }
+    #empty-state p { font-size: 14px; line-height: 1.5; max-width: 240px; }
+
+    /* ── Cards ──────────────────────────────────────────────── */
+    .card {
+      position: absolute;
+      width: min(calc(100vw - 32px), 420px);
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+      padding: 24px;
+      cursor: grab;
+      user-select: none;
+      transform-origin: bottom center;
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+      will-change: transform;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .card:active { cursor: grabbing; }
+    .card.is-dragging { transition: none; box-shadow: 0 16px 48px rgba(0,0,0,0.2); }
+    .card.throwing    { transition: transform 0.45s cubic-bezier(0.25,0.46,0.45,0.94), opacity 0.45s; }
+
+    /* Stack depth effect */
+    .card[data-depth="1"] { transform: scale(0.96) translateY(10px); z-index: 2; }
+    .card[data-depth="2"] { transform: scale(0.92) translateY(20px); z-index: 1; }
+
+    /* ── Card content ───────────────────────────────────────── */
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .competitor-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .card-counter { font-size: 11px; color: #9ca3af; }
+
+    .card h2 {
+      font-size: 19px;
+      font-weight: 800;
+      line-height: 1.3;
+      color: #111827;
+      margin-bottom: 12px;
+    }
+    .card .summary {
+      font-size: 13px;
+      color: #4b5563;
+      line-height: 1.65;
+      margin-bottom: 14px;
+    }
+    .why-box {
+      background: #f9fafb;
+      border-left: 3px solid var(--purple);
+      border-radius: 0 8px 8px 0;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: #374151;
+      line-height: 1.55;
+      margin-bottom: 12px;
+    }
+    .why-box strong { color: #111827; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; display: block; margin-bottom: 3px; }
+
+    /* ── PM Brief toggle ────────────────────────────────────── */
+    .pm-brief-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: none;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #374151;
+      cursor: pointer;
+      width: 100%;
+      margin-bottom: 12px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .pm-brief-btn:hover { background: #f9fafb; border-color: var(--purple); color: var(--purple); }
+    .pm-brief-btn .chevron { margin-left: auto; font-size: 10px; transition: transform 0.2s; }
+    .pm-brief-btn.open .chevron { transform: rotate(180deg); }
+    .pm-brief-btn.open { background: #f5f3ff; border-color: var(--purple); color: var(--purple); }
+
+    .pm-brief-body {
+      display: none;
+      background: #f5f3ff;
+      border: 1px solid #ddd6fe;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: #1e1b4b;
+      line-height: 1.7;
+    }
+    .pm-brief-body.open { display: block; }
+    .pm-brief-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--purple);
+      margin-bottom: 8px;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .source-btn {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--blue);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 10px;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      background: #eff6ff;
+      transition: background 0.15s;
+    }
+    .source-btn:hover { background: #dbeafe; }
+    .rank-dot {
+      display: flex; gap: 4px;
+    }
+    .rank-dot span {
+      width: 6px; height: 6px; border-radius: 50%; background: #e5e7eb;
+    }
+    .rank-dot span.filled { background: var(--purple); }
+
+    /* ── Swipe overlays ─────────────────────────────────────── */
+    .swipe-overlay {
+      position: absolute; inset: 0;
+      border-radius: 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 56px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.1s;
+    }
+    .overlay-dismiss { background: rgba(239,68,68,0.12); }
+    .overlay-save    { background: rgba(16,185,129,0.12); }
+    .overlay-share   { background: rgba(59,130,246,0.12); }
+
+    /* ── Action buttons ─────────────────────────────────────── */
+    #actions {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      padding: 20px 0 max(20px, env(safe-area-inset-bottom));
+      flex-shrink: 0;
+    }
+
+    .action-btn {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      border: 2px solid;
+      background: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .action-btn:hover  { transform: scale(1.08); box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
+    .action-btn:active { transform: scale(0.95); }
+
+    .btn-dismiss { border-color: var(--red);   color: var(--red); }
+    .btn-undo    { border-color: var(--gray);  color: var(--gray); width:44px; height:44px; font-size:18px; }
+    .btn-save    { border-color: var(--green); color: var(--green); width: 64px; height: 64px; font-size: 26px; }
+    .btn-share   { border-color: var(--blue);  color: var(--blue); }
+
+    .action-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none !important; }
+
+    /* ── Saved drawer ───────────────────────────────────────── */
+    #saved-drawer {
+      position: fixed; inset: 0; z-index: 100;
+      display: none;
+    }
+    #saved-drawer.open { display: flex; flex-direction: column; }
+
+    .drawer-backdrop {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(2px);
+    }
+    .drawer-panel {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: #fff;
+      border-radius: 20px 20px 0 0;
+      max-height: 75dvh;
+      display: flex; flex-direction: column;
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
+    }
+    .drawer-handle {
+      width: 40px; height: 4px; background: #e5e7eb;
+      border-radius: 2px; margin: 12px auto 16px;
+      flex-shrink: 0;
+    }
+    .drawer-title {
+      font-size: 15px; font-weight: 700; color: #111827;
+      padding: 0 20px 12px;
+      border-bottom: 1px solid #e5e7eb;
+      flex-shrink: 0;
+    }
+    .drawer-list {
+      overflow-y: auto; flex: 1;
+      padding: 12px 16px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+
+    .saved-item {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 14px;
+      display: flex; align-items: flex-start; gap: 12px;
+    }
+    .saved-item-text { flex: 1; min-width: 0; }
+    .saved-item h4 { font-size: 13px; font-weight: 700; color: #111827; line-height: 1.35; margin-bottom: 4px; }
+    .saved-item p  { font-size: 11px; color: #6b7280; }
+
+    .saved-item-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+    .mini-btn {
+      font-size: 11px; font-weight: 600;
+      padding: 4px 10px; border-radius: 6px; border: 1px solid;
+      cursor: pointer; background: #fff;
+      white-space: nowrap;
+    }
+    .mini-btn-restore { color: var(--purple); border-color: var(--purple); }
+    .mini-btn-source  { color: var(--blue);   border-color: var(--blue); }
+    .mini-btn-remove  { color: var(--red);    border-color: var(--red); }
+
+    .drawer-empty { text-align: center; color: #9ca3af; font-size: 14px; padding: 32px 0; }
+
+    /* ── Hint label shown briefly ───────────────────────────── */
+    #hint { display: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="header-logo">CompIntel</div>
+    <div class="header-sub" id="report-date">Loading…</div>
+  </div>
+  <div class="header-right">
+    <button class="icon-btn has-badge" id="saved-btn" data-count="0" title="Saved" aria-label="Saved items">🔖</button>
+  </div>
+</header>
+
+<div id="stack-area">
+  <div id="empty-state">
+    <div class="emoji">🎉</div>
+    <h3>You're all caught up</h3>
+    <p>No more cards in the stack. Check back after the next weekly run.</p>
+  </div>
+</div>
+
+<div id="actions">
+  <button class="action-btn btn-dismiss" id="btn-dismiss" title="Dismiss" aria-label="Dismiss">✕</button>
+  <button class="action-btn btn-undo"    id="btn-undo"    title="Undo"    aria-label="Undo">↩</button>
+  <button class="action-btn btn-save"    id="btn-save"    title="Save"    aria-label="Save for later">♥</button>
+  <button class="action-btn btn-share"   id="btn-share"   title="Share"   aria-label="Share">↗</button>
+</div>
+
+<!-- Saved drawer -->
+<div id="saved-drawer" role="dialog" aria-modal="true" aria-label="Saved items">
+  <div class="drawer-backdrop" id="drawer-backdrop"></div>
+  <div class="drawer-panel">
+    <div class="drawer-handle"></div>
+    <div class="drawer-title">Saved for later</div>
+    <div class="drawer-list" id="saved-list"></div>
+  </div>
+</div>
+
+<script>
+// ─── State ──────────────────────────────────────────────────────────────────
+const LS_DISMISSED = 'ci_dismissed_v1';
+const LS_SAVED     = 'ci_saved_v1';
+
+let queue        = [];   // items yet to be shown
+let dismissed    = new Set(JSON.parse(localStorage.getItem(LS_DISMISSED) || '[]'));
+let saved        = JSON.parse(localStorage.getItem(LS_SAVED)     || '[]');
+let undoStack    = [];   // last dismissed item for undo
+let reportMeta   = { date: '', competitors: [] };
+
+function persist() {
+  localStorage.setItem(LS_DISMISSED, JSON.stringify([...dismissed]));
+  localStorage.setItem(LS_SAVED,     JSON.stringify(saved));
+}
+
+function itemId(item) {
+  return `${item.report_date}:${item.rank}`;
+}
+
+// ─── Data loading ────────────────────────────────────────────────────────────
+async function loadAll() {
+  let slugs = ['latest'];
+  try {
+    const idx = await fetch('data/index.json').then(r => r.json());
+    slugs = idx.reports.map(s => s); // newest first
+  } catch (_) {}
+
+  const allItems = [];
+  const seenDates = new Set();
+
+  for (const slug of slugs) {
+    const url = slug === 'latest' ? 'data/latest.json' : `data/${slug}.json`;
+    try {
+      const report = await fetch(url).then(r => { if (!r.ok) throw 0; return r.json(); });
+      if (seenDates.has(report.date)) continue;
+      seenDates.add(report.date);
+
+      if (!reportMeta.date) {
+        reportMeta.date        = report.date;
+        reportMeta.competitors = report.competitors || [];
+      }
+
+      for (const item of report.top5) {
+        const enriched = { ...item, report_date: report.date };
+        const id = itemId(enriched);
+        const isSaved = saved.some(s => s._id === id);
+        if (!dismissed.has(id) && !isSaved) {
+          allItems.push(enriched);
+        }
+      }
+    } catch (_) {}
+  }
+
+  queue = allItems;
+  document.getElementById('report-date').textContent = reportMeta.date || 'No reports yet';
+  renderStack();
+  updateSavedBadge();
+}
+
+// ─── Stack rendering ─────────────────────────────────────────────────────────
+function renderStack() {
+  const area = document.getElementById('stack-area');
+  // Remove existing cards
+  area.querySelectorAll('.card').forEach(c => c.remove());
+
+  if (queue.length === 0) {
+    document.getElementById('empty-state').style.display = 'flex';
+    disableActions();
+    return;
+  }
+  document.getElementById('empty-state').style.display = 'none';
+
+  // Render up to 3 cards (back to front)
+  const visible = queue.slice(0, 3).reverse();
+  visible.forEach((item, idx) => {
+    const depth = visible.length - 1 - idx; // 2,1,0 → 0 is top
+    const card  = buildCard(item, depth);
+    area.appendChild(card);
+    if (depth === 0) attachDrag(card, item);
+  });
+
+  updateActions();
+}
+
+const CHIP_COLORS = [
+  ['#ede9fe','#5046e5'],['#d1fae5','#059669'],['#dbeafe','#1d4ed8'],
+  ['#fef3c7','#d97706'],['#fce7f3','#be185d'],['#e0f2fe','#0369a1'],
+  ['#f0fdf4','#16a34a'],
+];
+function chipColor(competitor) {
+  const idx = (competitor.charCodeAt(0) + competitor.length) % CHIP_COLORS.length;
+  return CHIP_COLORS[idx];
+}
+
+function buildCard(item, depth) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.dataset.depth = depth;
+  card.dataset.id    = itemId(item);
+
+  const [bg, fg] = chipColor(item.competitor);
+  const dots = Array.from({length: 5}, (_, i) =>
+    `<span class="${i < item.importance_score / 2 ? 'filled' : ''}"></span>`
+  ).join('');
+
+  const total = queue.length;
+  const pos   = queue.indexOf(item) + 1;
+
+  const briefId = `brief-${itemId(item).replace(/[^a-z0-9]/gi, '_')}`;
+
+  card.innerHTML = `
+    <div class="swipe-overlay overlay-dismiss">❌</div>
+    <div class="swipe-overlay overlay-save">🔖</div>
+    <div class="swipe-overlay overlay-share">↗️</div>
+    <div class="card-top">
+      <span class="competitor-chip" style="background:${bg};color:${fg}">${esc(item.competitor)}</span>
+      <span class="card-counter">${pos} / ${total}</span>
+    </div>
+    <h2>${esc(item.title)}</h2>
+    <p class="summary">${esc(item.summary)}</p>
+    <div class="why-box">
+      <strong>Why it matters</strong>
+      ${esc(item.why_it_matters)}
+    </div>
+    ${item.pm_summary ? `
+    <button class="pm-brief-btn" data-target="${briefId}">
+      🧠 PM Brief <span class="chevron">▼</span>
+    </button>
+    <div class="pm-brief-body" id="${briefId}">
+      <div class="pm-brief-label">PM Briefing</div>
+      ${esc(item.pm_summary)}
+    </div>` : ''}
+    <div class="card-footer">
+      ${item.source_url
+        ? `<a class="source-btn" href="${esc(item.source_url)}" target="_blank" rel="noopener">↗ Open source</a>`
+        : `<span style="font-size:11px;color:#9ca3af">${esc(item.report_date)}</span>`}
+      <div class="rank-dot">${dots}</div>
+    </div>
+  `;
+
+  // PM Brief toggle — stopPropagation so it doesn't trigger drag
+  const briefBtn = card.querySelector('.pm-brief-btn');
+  if (briefBtn) {
+    briefBtn.addEventListener('pointerdown', e => e.stopPropagation());
+    briefBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      const body = document.getElementById(briefBtn.dataset.target);
+      const open = body.classList.toggle('open');
+      briefBtn.classList.toggle('open', open);
+    });
+  }
+
+  // Source link — stop drag from triggering
+  const srcBtn = card.querySelector('.source-btn');
+  if (srcBtn) {
+    srcBtn.addEventListener('pointerdown', e => e.stopPropagation());
+  }
+
+  return card;
+}
+
+// ─── Drag / swipe ────────────────────────────────────────────────────────────
+const THROW_X  = 120;  // px to commit horizontal throw
+const THROW_Y  = 90;   // px to commit upward throw
+
+function attachDrag(card, item) {
+  let startX = 0, startY = 0;
+  let dx = 0, dy = 0;
+  let dragging = false;
+  let moved = false;
+
+  function onStart(e) {
+    if (e.type === 'mousedown' && e.button !== 0) return;
+    const pt = e.touches ? e.touches[0] : e;
+    startX = pt.clientX; startY = pt.clientY;
+    dx = 0; dy = 0; moved = false; dragging = true;
+    card.classList.add('is-dragging');
+    document.addEventListener('mousemove', onMove, { passive: true });
+    document.addEventListener('mouseup',   onEnd);
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend',  onEnd);
+  }
+
+  function onMove(e) {
+    if (!dragging) return;
+    if (e.cancelable) e.preventDefault();
+    const pt = e.touches ? e.touches[0] : e;
+    dx = pt.clientX - startX;
+    dy = pt.clientY - startY;
+    if (Math.abs(dx) > 6 || Math.abs(dy) > 6) moved = true;
+
+    const rot = dx * 0.07;
+    card.style.transform = `translate(${dx}px, ${dy}px) rotate(${rot}deg)`;
+
+    const dLeft    = card.querySelector('.overlay-dismiss');
+    const dRight   = card.querySelector('.overlay-save');
+    const dUp      = card.querySelector('.overlay-share');
+    const absDx = Math.abs(dx), absDy = Math.abs(dy);
+
+    if (absDy > absDx && dy < 0) {
+      // Upward
+      dLeft.style.opacity = dRight.style.opacity = '0';
+      dUp.style.opacity = Math.min(1, Math.abs(dy) / THROW_Y * 1.5);
+    } else {
+      dUp.style.opacity = '0';
+      dLeft.style.opacity  = dx < 0 ? Math.min(1, Math.abs(dx) / THROW_X * 1.5) : '0';
+      dRight.style.opacity = dx > 0 ? Math.min(1, Math.abs(dx) / THROW_X * 1.5) : '0';
+    }
+  }
+
+  function onEnd() {
+    if (!dragging) return;
+    dragging = false;
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup',   onEnd);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('touchend',  onEnd);
+    card.classList.remove('is-dragging');
+
+    const absDx = Math.abs(dx), absDy = Math.abs(dy);
+
+    if (!moved) {
+      resetCard(card);
+      return;
+    }
+
+    if (absDy > absDx && dy < -THROW_Y) {
+      doShare(item, card);
+    } else if (dx > THROW_X) {
+      doSave(item, card);
+    } else if (dx < -THROW_X) {
+      doDismiss(item, card);
+    } else {
+      resetCard(card);
+    }
+  }
+
+  card.addEventListener('mousedown',  onStart);
+  card.addEventListener('touchstart', onStart, { passive: true });
+}
+
+function resetCard(card) {
+  card.style.transition = 'transform 0.35s cubic-bezier(0.175,0.885,0.32,1.275)';
+  card.style.transform  = '';
+  card.querySelectorAll('.swipe-overlay').forEach(o => o.style.opacity = '0');
+  setTimeout(() => card.style.transition = '', 350);
+}
+
+function throwCard(card, tx, ty, cb) {
+  card.classList.add('throwing');
+  card.style.transform = `translate(${tx}px, ${ty}px) rotate(${tx * 0.05}deg)`;
+  card.style.opacity   = '0';
+  setTimeout(cb, 450);
+}
+
+// ─── Actions ─────────────────────────────────────────────────────────────────
+function doDismiss(item, card) {
+  throwCard(card, -window.innerWidth * 1.3, 0, () => {
+    dismissed.add(itemId(item));
+    undoStack.push({ item, action: 'dismiss' });
+    queue = queue.filter(q => itemId(q) !== itemId(item));
+    persist();
+    renderStack();
+  });
+}
+
+function doSave(item, card) {
+  throwCard(card, window.innerWidth * 1.3, 0, () => {
+    const id = itemId(item);
+    if (!saved.some(s => s._id === id)) {
+      saved.unshift({ ...item, _id: id });
+    }
+    undoStack.push({ item, action: 'save' });
+    queue = queue.filter(q => itemId(q) !== id);
+    persist();
+    updateSavedBadge();
+    renderStack();
+  });
+}
+
+function doShare(item, card) {
+  // Animate up briefly then settle back
+  card.classList.add('throwing');
+  card.style.transform = `translateY(-${window.innerHeight * 0.15}px)`;
+  card.style.opacity   = '0.6';
+  setTimeout(() => {
+    card.classList.remove('throwing');
+    resetCard(card);
+  }, 300);
+
+  const text = `${item.title} — ${item.competitor}`;
+  const url  = item.source_url || window.location.href;
+  if (navigator.share) {
+    navigator.share({ title: text, url }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(`${text}\n${url}`).then(() => {
+      showToast('Copied to clipboard');
+    }).catch(() => {
+      showToast('Share: ' + url);
+    });
+  }
+}
+
+function doUndo() {
+  const last = undoStack.pop();
+  if (!last) return;
+  const id = itemId(last.item);
+  if (last.action === 'dismiss') {
+    dismissed.delete(id);
+    queue.unshift(last.item);
+  } else if (last.action === 'save') {
+    saved = saved.filter(s => s._id !== id);
+    queue.unshift(last.item);
+    updateSavedBadge();
+  }
+  persist();
+  renderStack();
+}
+
+// ─── Button wiring ────────────────────────────────────────────────────────────
+document.getElementById('btn-dismiss').addEventListener('click', () => {
+  if (queue.length === 0) return;
+  const top = document.querySelector('.card[data-depth="0"]');
+  if (top) doDismiss(queue[0], top);
+});
+document.getElementById('btn-save').addEventListener('click', () => {
+  if (queue.length === 0) return;
+  const top = document.querySelector('.card[data-depth="0"]');
+  if (top) doSave(queue[0], top);
+});
+document.getElementById('btn-share').addEventListener('click', () => {
+  if (queue.length === 0) return;
+  const top = document.querySelector('.card[data-depth="0"]');
+  if (top) doShare(queue[0], top);
+});
+document.getElementById('btn-undo').addEventListener('click', doUndo);
+
+function updateActions() {
+  const empty = queue.length === 0;
+  ['btn-dismiss','btn-save','btn-share'].forEach(id => {
+    document.getElementById(id).disabled = empty;
+  });
+  document.getElementById('btn-undo').disabled = undoStack.length === 0;
+}
+function disableActions() {
+  ['btn-dismiss','btn-save','btn-share','btn-undo'].forEach(id => {
+    document.getElementById(id).disabled = true;
+  });
+}
+
+// ─── Saved drawer ─────────────────────────────────────────────────────────────
+function updateSavedBadge() {
+  const btn = document.getElementById('saved-btn');
+  btn.dataset.count = saved.length;
+  btn.style.display = saved.length === 0 ? 'none' : '';
+}
+
+function openSavedDrawer() {
+  const list = document.getElementById('saved-list');
+  list.innerHTML = '';
+
+  if (saved.length === 0) {
+    list.innerHTML = '<div class="drawer-empty">Nothing saved yet.<br>Swipe right on a card to save it.</div>';
+  } else {
+    saved.forEach((item, idx) => {
+      const el = document.createElement('div');
+      el.className = 'saved-item';
+      el.innerHTML = `
+        <div class="saved-item-text">
+          <h4>${esc(item.title)}</h4>
+          <p>${esc(item.competitor)} · ${esc(item.report_date)}</p>
+        </div>
+        <div class="saved-item-actions">
+          <button class="mini-btn mini-btn-restore" data-idx="${idx}">↩ Restore</button>
+          ${item.source_url ? `<a class="mini-btn mini-btn-source" href="${esc(item.source_url)}" target="_blank" rel="noopener">↗ Source</a>` : ''}
+          <button class="mini-btn mini-btn-remove"  data-idx="${idx}">✕</button>
+        </div>
+      `;
+      list.appendChild(el);
+    });
+
+    list.querySelectorAll('.mini-btn-restore').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.dataset.idx, 10);
+        const item = saved.splice(i, 1)[0];
+        queue.unshift({ ...item });
+        persist();
+        updateSavedBadge();
+        closeSavedDrawer();
+        renderStack();
+      });
+    });
+
+    list.querySelectorAll('.mini-btn-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.dataset.idx, 10);
+        saved.splice(i, 1);
+        persist();
+        updateSavedBadge();
+        openSavedDrawer(); // re-render list
+      });
+    });
+  }
+
+  document.getElementById('saved-drawer').classList.add('open');
+}
+
+function closeSavedDrawer() {
+  document.getElementById('saved-drawer').classList.remove('open');
+}
+
+document.getElementById('saved-btn').addEventListener('click', openSavedDrawer);
+document.getElementById('drawer-backdrop').addEventListener('click', closeSavedDrawer);
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  let t = document.getElementById('_toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = '_toast';
+    Object.assign(t.style, {
+      position:'fixed',bottom:'90px',left:'50%',transform:'translateX(-50%)',
+      background:'#1a1a1a',color:'#fff',padding:'8px 16px',borderRadius:'20px',
+      fontSize:'13px',zIndex:'200',pointerEvents:'none',opacity:'0',
+      transition:'opacity 0.2s',
+    });
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  setTimeout(() => { t.style.opacity = '0'; }, 2000);
+}
+
+// ─── Utils ────────────────────────────────────────────────────────────────────
+function esc(s) {
+  if (!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── Keyboard shortcuts ───────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (document.getElementById('saved-drawer').classList.contains('open')) {
+    if (e.key === 'Escape') closeSavedDrawer();
+    return;
+  }
+  if (e.key === 'ArrowLeft')  document.getElementById('btn-dismiss').click();
+  if (e.key === 'ArrowRight') document.getElementById('btn-save').click();
+  if (e.key === 'ArrowUp')    document.getElementById('btn-share').click();
+  if (e.key === 'z' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); doUndo(); }
+});
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+updateSavedBadge();
+loadAll();
+</script>
+</body>
+</html>
