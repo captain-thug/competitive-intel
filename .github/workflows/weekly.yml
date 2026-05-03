@@ -20,7 +20,7 @@ jobs:
           cache: 'pip'
 
       - name: Install dependencies
-        run: pip install anthropic pydantic python-dotenv
+        run: pip install -r requirements.txt
 
       - name: Run competitive intelligence agent
         env:
